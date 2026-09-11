@@ -766,21 +766,4 @@ No temporary DROP rule remained
 
 ---
 
-# 20. Next Steps
-
-The SSH containment workflow is now complete.
-
-Potential next security-lab phases:
-
-1. Document this milestone in GitHub.
-2. Improve alerting and visualization in the Wazuh dashboard.
-3. Test additional authentication attacks safely.
-4. Build custom Wazuh detection rules.
-5. Explore file-integrity monitoring.
-6. Investigate Security Configuration Assessment results.
-7. Add network/security monitoring.
-8. Build additional automated responses.
-9. Document the complete security architecture.
-10. Eventually connect the homelab security work to cloud security concepts.
-
 > **Lab status: Detection and automated SSH containment successfully demonstrated.**

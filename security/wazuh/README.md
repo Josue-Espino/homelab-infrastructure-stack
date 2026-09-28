@@ -334,26 +334,6 @@ Testing automated firewall response against a remotely managed host can lock out
 
 ---
 
-## Project Status
-
-- [x] Architecture planned
-- [x] Wazuh VM deployed
-- [x] Wazuh installed
-- [x] Wazuh server hardened
-- [x] Linux agent deployed
-- [x] Windows agent deployed
-- [x] Windows authentication monitoring validated
-- [x] Windows Defender telemetry integrated
-- [x] Windows Firewall telemetry integrated
-- [x] Controlled detection testing completed
-- [x] SSH Active Response validated
-- [x] Custom SSH containment implemented
-- [ ] Final evidence organization
-- [ ] Final GitHub documentation cleanup
-- [ ] Additional security telemetry/integrations
-
----
-
 ## Related Documentation
 
 Detailed SSH detection and Active Response documentation is maintained in:

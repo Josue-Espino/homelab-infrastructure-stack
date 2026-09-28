@@ -761,7 +761,7 @@ WAZUH-SSH-CONTAIN
 
 ---
 
-# 21. Evidence
+# 20. Evidence
 
 Useful evidence captured during the lab includes:
 
@@ -814,7 +814,7 @@ Validate source
 
 ---
 
-# 22. Final Takeaway
+# 21. Final Takeaway
 
 The SSH detection lab evolved from a basic detection-and-block experiment into a safer automated response design.
 

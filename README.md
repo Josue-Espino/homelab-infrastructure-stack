@@ -605,6 +605,14 @@ The Proxmox media automation environment is documented under `media-automation/R
 
 ---
 
+## Remote Access
+
+The WireGuard remote-access environment is documented under `remote-access/wireguard/README.md`.
+
+It provides encrypted remote access to the homelab through the Raspberry Pi while keeping internal services behind the homelab's access boundaries.
+
+---
+
 ## Security Posture and Remediation Status
 
 **Review status:** Security audit and repository remediation in progress  

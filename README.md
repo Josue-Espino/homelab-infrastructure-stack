@@ -613,6 +613,14 @@ It provides encrypted remote access to the homelab through the Raspberry Pi whil
 
 ---
 
+## Internal PKI / TLS
+
+The internal certificate infrastructure is documented under `security/pki/README.md`.
+
+It provides a private Root CA and trusted HTTPS certificates for internal `home.arpa` services.
+
+---
+
 ## Security Posture and Remediation Status
 
 **Review status:** Security audit and repository remediation in progress  

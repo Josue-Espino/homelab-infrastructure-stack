@@ -18,7 +18,7 @@ This was tested with a controlled SSH attack from the Wazuh server against the P
                     ┌─────────────────────────────┐
                     │       Wazuh Server          │
                     │                             │
-                    │  IP: 192.168.200.245        │
+                    │  IP: 192.168.200.180        │
                     │  Wazuh Manager              │
                     └──────────────┬──────────────┘
                                    │
@@ -41,7 +41,9 @@ This was tested with a controlled SSH attack from the Wazuh server against the P
 - **Wazuh Manager:** `wazuh`
 - **Wazuh Agent:** `pihole`
 - **Pi-hole IP:** `192.168.200.178`
-- **Wazuh server/test source IP:** `192.168.200.245`
+- **Wazuh server IP:** `192.168.200.180`
+- **Historical Windows test source IP:** `192.168.200.245`
+- **Current Windows test source IP:** `192.168.200.182`
 - **Wazuh version:** `4.14.7`
 - **Pi-hole architecture:** ARM64 / AArch64
 - **Firewall:** `iptables` using the `nf_tables` backend
@@ -388,180 +390,229 @@ This proved that the detection rule worked before performing a live test.
 
 ---
 
-# 10. Configuring Automated Firewall Response
+# 10. Initial Automated Firewall Response
 
-On the Wazuh server, the active-response configuration was verified:
+The first response design used Wazuh's built-in `firewall-drop` command.
 
-```bash
-sudo grep -n -A12 -B5 "<active-response>" /var/ossec/etc/ossec.conf
-```
+The initial configuration connected Rule 5710 to the response with a five-minute timeout.
 
-The relevant configuration was:
+A controlled SSH authentication event was generated from the Windows workstation. The historical test source was `192.168.200.245`.
 
-```xml
+The event was detected successfully and Wazuh invoked:
+
+~~~text
+active-response/bin/firewall-drop
+~~~
+
+This proved that the detection-to-response pipeline was working.
+
+---
+
+# 11. Important Finding: Stock `firewall-drop` Affected Docker Forwarding
+
+The initial test exposed an important operational problem.
+
+The Pi-hole also hosts Docker services. The stock `firewall-drop` response inserted a DROP rule affecting the Pi-hole's FORWARD chain.
+
+The observed rule was:
+
+~~~text
+-A FORWARD -s 192.168.200.245/32 -j DROP
+~~~
+
+This interfered with forwarded Docker traffic and temporarily disrupted access to services running behind the Pi-hole.
+
+The rule had to be removed to restore normal connectivity.
+
+The clean firewall state after recovery showed the Docker forwarding chains intact and an empty INPUT chain.
+
+### Engineering conclusion
+
+The problem was not Wazuh detection. The problem was that a generic IP-level firewall response was not appropriate for a host that also participates in Docker forwarding.
+
+> **Operational lesson:** successful automated containment is not automatically safe containment.
+
+This finding led to a redesign rather than continuing to use the stock response.
+
+---
+
+# 12. Custom SSH Containment Design
+
+The stock `firewall-drop` response was replaced with a custom Active Response named:
+
+~~~text
+ssh_contain
+~~~
+
+The response was designed specifically around the homelab architecture.
+
+### Design requirements
+
+The custom response:
+
+- Extracts the source IP from the Wazuh alert
+- Rejects IPv6 addresses
+- Restricts containment to `192.168.200.0/24`
+- Protects the management workstation
+- Targets the Pi-hole INPUT chain
+- Restricts containment to TCP port 22
+- Does not modify the Docker FORWARD path
+- Avoids duplicate rules
+- Tags rules with `WAZUH-SSH-CONTAIN`
+- Supports Wazuh add/delete Active Response operations
+- Uses a five-minute timeout
+
+The management workstation is explicitly protected because testing automated firewall response against the administrator's own source address can otherwise cause an immediate lockout.
+
+---
+
+# 13. Custom Response Implementation
+
+The source script was developed under:
+
+~~~text
+/root/wazuh-ar-lab/ssh_contain.py
+~~~
+
+and deployed to:
+
+~~~text
+/var/ossec/active-response/bin/ssh_contain
+~~~
+
+The deployed script uses restricted ownership and permissions:
+
+~~~text
+root:wazuh
+mode 750
+~~~
+
+The source and deployed script SHA-256 hash was verified as:
+
+~~~text
+56e3f4acf0a1891d0499bbc2e8136d707db7457432ca04ca789852a216fb3712
+~~~
+
+Operational logging is written to:
+
+~~~text
+/var/ossec/logs/ssh-contain.log
+~~~
+
+Before live integration, the response was tested against:
+
+- Trusted management workstation
+- Untrusted host inside the homelab LAN
+- Host outside the homelab LAN
+- Public IPv4 address
+- IPv6 address
+
+The dry-run tests confirmed that only eligible LAN IPv4 addresses could be considered for containment and that the trusted management workstation was excluded.
+
+---
+
+# 14. Wazuh Manager Configuration
+
+The custom command was registered on the Wazuh manager:
+
+~~~xml
+<command>
+  <name>ssh_contain</name>
+  <executable>ssh_contain</executable>
+  <timeout_allowed>yes</timeout_allowed>
+</command>
+~~~
+
+Rule 5710 was connected to the custom response:
+
+~~~xml
 <active-response>
   <disabled>no</disabled>
-  <command>firewall-drop</command>
+  <command>ssh_contain</command>
   <location>local</location>
   <rules_id>5710</rules_id>
   <timeout>300</timeout>
 </active-response>
-```
+~~~
 
-The command definition was also verified:
+A backup of the manager configuration was created before the custom response was deployed:
 
-```xml
-<command>
-  <name>firewall-drop</name>
-  <executable>firewall-drop</executable>
-  <timeout_allowed>yes</timeout_allowed>
-</command>
-```
+~~~text
+/var/ossec/etc/ossec.conf.before-custom-ssh-response
+~~~
 
-This means:
-
-- Rule `5710` triggers the response
-- `firewall-drop` is executed
-- The response occurs locally on the agent where the alert originated
-- The block lasts `300` seconds
-
-`300` seconds equals **5 minutes**.
+The Wazuh manager configuration was validated after the change.
 
 ---
 
-# 11. Live Controlled Attack
+# 15. Real Active Response Validation
 
-A real controlled SSH login attempt was generated from the Windows workstation:
+A controlled SSH authentication event was generated against Pi-hole using the current Windows workstation:
 
-```powershell
-ssh nonexistentuser@192.168.200.178
-```
+~~~text
+192.168.200.182
+~~~
 
-The Pi-hole responded:
+The real Wazuh Active Response log showed:
 
-```text
-nonexistentuser@192.168.200.178's password:
-Permission denied, please try again.
-```
+~~~text
+Received command=add, srcip=192.168.200.182
+~~~
 
-The attempt originated from:
+The custom response recognized the management workstation as trusted and correctly refused to install a blocking rule:
 
-```text
-192.168.200.245
-```
+~~~text
+SAFETY: 192.168.200.182 is trusted; no block installed
+~~~
 
-This was an intentional test against the homelab.
+The Pi-hole INPUT chain remained unchanged and the Docker FORWARD chain was not modified.
 
----
-
-# 12. Wazuh Detected the Attack
-
-On the Wazuh server, the alert log showed the actual Pi-hole SSH event:
-
-```text
-Failed password for invalid user nonexistentuser from 192.168.200.245
-```
-
-The alert data included:
-
-```text
-parameters.alert.agent.ip: 192.168.200.178
-parameters.alert.data.srcip: 192.168.200.245
-parameters.alert.data.srcuser: nonexistentuser
-parameters.alert.predecoder.program_name: sshd-session
-```
-
-Most importantly, the alert showed:
-
-```text
-parameters.program: active-response/bin/firewall-drop
-```
-
-This confirmed that the active-response mechanism was invoked.
+This validated the most important safety requirement: the automated response could process the real Wazuh event without locking out the management workstation.
 
 ---
 
-# 13. Automated Firewall Block
+# 16. Final Containment Behavior
 
-Immediately after the controlled attack, SSH access from the Wazuh server to Pi-hole was lost.
+For an eligible, untrusted IPv4 source on the homelab LAN, the custom response is designed to add a temporary rule to the Pi-hole INPUT chain that targets SSH only.
 
-The Pi-hole firewall was later inspected after reconnecting:
+The rule is tagged:
 
-```bash
-sudo iptables -L INPUT -n -v --line-numbers
-```
+~~~text
+WAZUH-SSH-CONTAIN
+~~~
 
-During the active response, the INPUT chain contained:
+This intentionally avoids blocking unrelated forwarded traffic such as:
 
-```text
-1   ...   DROP   all   --   *   *   192.168.200.245   0.0.0.0/0
-```
+- Docker networking
+- Jellyfin
+- Uptime Kuma
+- WireGuard forwarding
 
-This demonstrated that Wazuh had automatically inserted a temporary firewall rule blocking the attacking IP.
+The Wazuh timeout is:
 
-The rule specifically blocked:
+~~~text
+300 seconds
+~~~
 
-```text
-192.168.200.245
-```
-
-from reaching the Pi-hole.
-
----
-
-# 14. Automatic Expiration
-
-The configured response timeout was:
-
-```xml
-<timeout>300</timeout>
-```
-
-After approximately five minutes, SSH access returned.
-
-We then checked:
-
-```bash
-sudo iptables -L INPUT -n -v --line-numbers
-```
-
-The result was:
-
-```text
-Chain INPUT (policy ACCEPT ...)
-num   pkts bytes target     prot opt in     out     source     destination
-```
-
-There was **no DROP rule** remaining.
-
-This confirmed that the active response:
-
-1. Added the firewall block.
-2. Prevented access from the test source.
-3. Automatically removed the block after the configured timeout.
-4. Restored normal connectivity.
+When the timeout expires, Wazuh sends the corresponding delete operation so the exact containment rule can be removed.
 
 ---
 
-# 15. Final Security Workflow
+# 17. Final Security Workflow
 
-The completed workflow is:
-
-```
+~~~text
 ┌─────────────────────────┐
-│ Controlled SSH Attack   │
-│ 192.168.200.245         │
+│ SSH authentication      │
+│ attempt                 │
 └────────────┬────────────┘
              │
-             │ SSH login attempt
              ▼
 ┌─────────────────────────┐
-│ Pi-hole                 │
+│ Pi-hole sshd            │
 │ 192.168.200.178         │
-│ sshd-session            │
 └────────────┬────────────┘
              │
-             │ Failed login
+             │ Invalid user
              ▼
 ┌─────────────────────────┐
 │ Wazuh Agent             │
@@ -578,127 +629,141 @@ The completed workflow is:
              │ Alert
              ▼
 ┌─────────────────────────┐
-│ Active Response         │
-│ firewall-drop           │
+│ Custom Active Response  │
+│ ssh_contain             │
 └────────────┬────────────┘
+             │
+             ├─────────────── Trusted source
+             │                → No block
+             │
+             ├─────────────── Invalid scope/IP
+             │                → Reject
              │
              ▼
 ┌─────────────────────────┐
-│ Pi-hole iptables        │
-│ DROP 192.168.200.245    │
+│ Pi-hole INPUT chain     │
+│ TCP/22 only             │
+│ WAZUH-SSH-CONTAIN       │
 └────────────┬────────────┘
              │
              │ 300 seconds
              ▼
 ┌─────────────────────────┐
-│ Automatic rule removal  │
-│ Access restored         │
+│ Wazuh delete operation  │
+│ Temporary rule removed  │
 └─────────────────────────┘
-```
+~~~
 
 ---
 
-# 16. Troubleshooting Lessons
+# 18. Troubleshooting Lessons
 
 ## `iptables` itself was not broken
 
-The Pi-hole had a valid ARM64 `iptables-nft` installation.
+The Pi-hole had a valid ARM64 `iptables-nft` implementation:
 
-The system reported:
-
-```text
+~~~text
 iptables v1.8.11 (nf_tables)
-```
+~~~
 
-and root could successfully manipulate the INPUT chain.
+Root could successfully inspect and manipulate firewall state.
 
-## `wazuh-execd` runs as root
+## `wazuh-execd` runs with root privileges
 
-The Wazuh execution daemon was verified as:
+The Wazuh execution daemon was verified as running as root, allowing Active Response scripts to perform privileged operations.
 
-```text
-USER: root
-EUSER: root
-```
+## Active Response must be enabled on the agent
 
-This is important because active responses need sufficient privileges to modify firewall state.
+The Pi-hole initially had Active Response disabled. Changing:
 
-## Active response must be enabled on the agent
-
-The Pi-hole initially had:
-
-```xml
+~~~xml
 <disabled>yes</disabled>
-```
+~~~
 
-Changing it to:
+to:
 
-```xml
+~~~xml
 <disabled>no</disabled>
-```
+~~~
 
 and restarting the agent was necessary.
 
-## Manual execution is not identical to a real active response
+## Manual execution is not identical to a real Active Response
 
-Directly feeding JSON to `firewall-drop` produced confusing `check_keys`, `continue`, and stdin behavior.
+Directly executing `firewall-drop` with test JSON produced confusing `check_keys` and `continue` behavior.
 
-The successful live test demonstrated that the correct Wazuh execution path was functioning.
+The actual Wazuh Active Response execution path was the authoritative test.
 
-## Be careful when testing firewall automation remotely
+## Generic firewall responses need architectural awareness
 
-Because the test source was the Wazuh server itself, a successful firewall-drop response immediately blocked our SSH connection to the Pi-hole.
+The largest lesson from the first implementation was that firewall automation must account for how the target host is used.
 
-The five-minute timeout allowed access to recover automatically.
+The Pi-hole is not simply an SSH server. It also participates in Docker networking and other homelab services.
 
-This is a useful operational lesson:
-
-> Never test automated firewall containment remotely without knowing how you will regain access.
+A response that blocks an entire source IP through the FORWARD chain can therefore have consequences beyond SSH.
 
 ---
 
-# 17. Current Configuration
+# 19. Final Configuration
 
 ### Wazuh Manager
 
-```xml
+~~~xml
 <command>
-  <name>firewall-drop</name>
-  <executable>firewall-drop</executable>
+  <name>ssh_contain</name>
+  <executable>ssh_contain</executable>
   <timeout_allowed>yes</timeout_allowed>
 </command>
 
 <active-response>
   <disabled>no</disabled>
-  <command>firewall-drop</command>
+  <command>ssh_contain</command>
   <location>local</location>
   <rules_id>5710</rules_id>
   <timeout>300</timeout>
 </active-response>
-```
+~~~
 
 ### Pi-hole Agent
 
-```xml
+~~~xml
 <active-response>
     <disabled>no</disabled>
     <ca_store>etc/wpk_root.pem</ca_store>
     <ca_verification>yes</ca_verification>
 </active-response>
-```
+~~~
 
-### Firewall State After Test
+### Response Scope
 
-```text
-INPUT policy: ACCEPT
-Temporary Wazuh DROP rule: removed
-```
+~~~text
+Eligible source:
+192.168.200.0/24 IPv4
+
+Protected management source:
+192.168.200.182
+
+Target:
+Pi-hole INPUT
+
+Protocol:
+TCP
+
+Port:
+22
+
+Timeout:
+300 seconds
+
+Rule tag:
+WAZUH-SSH-CONTAIN
+~~~
 
 ---
 
-# 18. Security Lab Milestone
+# 20. Security Lab Milestone
 
-## Completed: Wazuh SSH Detection + Automated Firewall Response
+## Completed: Wazuh SSH Detection + Safety-Focused Automated Containment
 
 ### Detection
 
@@ -708,62 +773,102 @@ Temporary Wazuh DROP rule: removed
 - [x] SSH event decoded
 - [x] Rule 5710 identified
 - [x] Rule 5710 tested with `wazuh-logtest`
-- [x] Real SSH attack generated
-- [x] Alert generated by Wazuh
+- [x] Real SSH authentication event generated
+- [x] Wazuh alert generated
 
-### Response
+### Initial Response Investigation
 
-- [x] `firewall-drop` command verified
-- [x] Active response enabled on Pi-hole
-- [x] Rule 5710 connected to active response
-- [x] `iptables` response executed
-- [x] Attacking IP automatically blocked
-- [x] SSH access successfully interrupted
-- [x] 300-second timeout verified
-- [x] Firewall rule automatically removed
+- [x] Built-in `firewall-drop` tested
+- [x] Automated firewall insertion observed
+- [x] Docker/FORWARD-chain side effect identified
 - [x] Connectivity restored
+- [x] Safer response requirements defined
+
+### Custom Response
+
+- [x] `ssh_contain` implemented
+- [x] Source validation tested
+- [x] Trusted management source protection tested
+- [x] LAN scope validation tested
+- [x] IPv6 rejection tested
+- [x] Duplicate-rule protection implemented
+- [x] INPUT-chain SSH-only containment designed
+- [x] Wazuh command configured
+- [x] Rule 5710 connected to custom response
+- [x] Real Active Response event validated
+- [x] Management workstation remained unblocked
 
 ---
 
-# 19. Evidence
+# 21. Evidence
 
 Useful evidence captured during the lab includes:
 
-### Rule detection
+### Detection rule
 
-```text
+~~~text
 Rule: 5710
 Level: 5
 Description: sshd: Attempt to login using a non-existent user
-Source IP: 192.168.200.245
-```
+~~~
 
-### Live attack
+### Initial stock response
 
-```text
-Failed password for invalid user nonexistentuser
-from 192.168.200.245
-```
+~~~text
+-A FORWARD -s 192.168.200.245/32 -j DROP
+~~~
 
-### Active response
+This demonstrated why the default response was not appropriate for the Pi-hole's Docker environment.
 
-```text
-parameters.program: active-response/bin/firewall-drop
-```
+### Custom response
 
-### Firewall block
+~~~text
+ssh_contain
+~~~
 
-```text
-DROP all -- 192.168.200.245 0.0.0.0/0
-```
+### Safety validation
 
-### Cleanup
+~~~text
+Received command=add, srcip=192.168.200.182
+SAFETY: 192.168.200.182 is trusted; no block installed
+~~~
 
-```text
-INPUT chain returned to its normal state
-No temporary DROP rule remained
-```
+### Final design
+
+~~~text
+Wazuh Rule 5710
+        |
+        v
+ssh_contain
+        |
+        v
+Validate source
+        |
+        +---- Trusted management IP -> No block
+        |
+        +---- Invalid scope/IP -> Reject
+        |
+        +---- Eligible LAN IPv4 -> SSH-only INPUT containment
+~~~
 
 ---
 
-> **Lab status: Detection and automated SSH containment successfully demonstrated.**
+# 22. Final Takeaway
+
+The SSH detection lab evolved from a basic detection-and-block experiment into a safer automated response design.
+
+The initial implementation proved that Wazuh could detect the SSH event and automatically modify the Pi-hole firewall. The resulting Docker networking disruption then provided a practical reason to redesign the response.
+
+The final implementation separates **detection** from **containment policy**:
+
+- Wazuh detects the SSH event.
+- Rule 5710 identifies the invalid-user condition.
+- `ssh_contain` validates the source.
+- Trusted management addresses are protected.
+- Only eligible LAN IPv4 sources are considered.
+- Containment targets SSH instead of general forwarded traffic.
+- The response is temporary and tied to Wazuh's timeout lifecycle.
+
+This became the first completed automated-response workflow in the Wazuh security lab.
+
+> **Lab status: SSH detection and safety-focused automated containment successfully demonstrated.**

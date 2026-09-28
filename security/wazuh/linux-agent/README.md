@@ -370,44 +370,7 @@ The final response therefore includes a trusted management source safeguard.
 
 ---
 
-# 16. Completed Milestone
-
-## Wazuh Linux Endpoint Monitoring
-
-### Deployment
-
-- [x] Pi-hole enrolled as Wazuh Agent 001
-- [x] Agent connected to Wazuh Manager
-- [x] Linux endpoint monitoring established
-
-### Monitoring
-
-- [x] SSH monitoring
-- [x] File Integrity Monitoring
-- [x] Rootcheck
-- [x] Security Configuration Assessment
-- [x] System inventory
-- [x] Process/service visibility
-- [x] Network visibility
-
-### Detection
-
-- [x] SSH invalid-user event validated
-- [x] Rule 5710 validated
-- [x] Real controlled SSH event generated
-- [x] Wazuh alert confirmed
-
-### Response
-
-- [x] Active Response enabled
-- [x] Built-in firewall response investigated
-- [x] Docker forwarding side effect identified
-- [x] Custom SSH containment designed
-- [x] Management source protection validated
-
----
-
-# 17. Final Architecture
+# 16. Final Architecture
 
 ```text
                          Pi-hole

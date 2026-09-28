@@ -761,45 +761,6 @@ WAZUH-SSH-CONTAIN
 
 ---
 
-# 20. Security Lab Milestone
-
-## Completed: Wazuh SSH Detection + Safety-Focused Automated Containment
-
-### Detection
-
-- [x] Wazuh agent installed on Pi-hole
-- [x] Pi-hole connected to Wazuh Manager
-- [x] SSH logs collected
-- [x] SSH event decoded
-- [x] Rule 5710 identified
-- [x] Rule 5710 tested with `wazuh-logtest`
-- [x] Real SSH authentication event generated
-- [x] Wazuh alert generated
-
-### Initial Response Investigation
-
-- [x] Built-in `firewall-drop` tested
-- [x] Automated firewall insertion observed
-- [x] Docker/FORWARD-chain side effect identified
-- [x] Connectivity restored
-- [x] Safer response requirements defined
-
-### Custom Response
-
-- [x] `ssh_contain` implemented
-- [x] Source validation tested
-- [x] Trusted management source protection tested
-- [x] LAN scope validation tested
-- [x] IPv6 rejection tested
-- [x] Duplicate-rule protection implemented
-- [x] INPUT-chain SSH-only containment designed
-- [x] Wazuh command configured
-- [x] Rule 5710 connected to custom response
-- [x] Real Active Response event validated
-- [x] Management workstation remained unblocked
-
----
-
 # 21. Evidence
 
 Useful evidence captured during the lab includes:

@@ -621,6 +621,14 @@ It provides a private Root CA and trusted HTTPS certificates for internal `home.
 
 ---
 
+## Backup & Recovery
+
+The automated backup environment is documented under `backup-recovery/README.md`.
+
+It protects key application databases by copying them on a scheduled basis to a separate SMB-backed storage location.
+
+---
+
 ## Security Posture and Remediation Status
 
 **Review status:** Security audit and repository remediation in progress  

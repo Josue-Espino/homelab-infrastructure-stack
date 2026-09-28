@@ -599,6 +599,12 @@ security/wazuh/
 
 ---
 
+## Media Automation
+
+The Proxmox media automation environment is documented under `media-automation/README.md`.
+
+---
+
 ## Security Posture and Remediation Status
 
 **Review status:** Security audit and repository remediation in progress  

@@ -507,45 +507,7 @@ These backups provided rollback points while the telemetry sources were being de
 
 ---
 
-# 18. Completed Milestone
-
-## Wazuh Windows Endpoint Monitoring
-
-### Deployment
-
-- [x] Wazuh Windows agent installed
-- [x] Agent configured for Wazuh Manager
-- [x] Windows service started
-- [x] Agent registered as ID 002
-- [x] Manager connectivity validated
-
-### Event Monitoring
-
-- [x] Application event channel collected
-- [x] Security event channel collected
-- [x] System event channel collected
-- [x] Controlled authentication failure generated
-- [x] Windows Event 4625 verified
-- [x] Wazuh Rule 60122 verified
-
-### Endpoint Security Telemetry
-
-- [x] Windows Defender Operational channel verified
-- [x] Defender channel added to Wazuh
-- [x] Windows Firewall logging configured
-- [x] Native Windows Firewall event channel verified
-- [x] Native firewall channel added to Wazuh
-
-### Endpoint Monitoring
-
-- [x] File Integrity Monitoring enabled
-- [x] Security Configuration Assessment enabled
-- [x] System inventory enabled
-- [x] Active Response framework enabled
-
----
-
-# 19. Final Architecture
+# 18. Final Architecture
 
 ```text
                          Windows 11 Pro

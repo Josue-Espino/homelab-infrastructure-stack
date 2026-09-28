@@ -4,7 +4,7 @@
 
 This project documents the integrated infrastructure stack deployed in my Raspberry Pi homelab.
 
-The environment combines centralized DNS filtering, reverse proxying, infrastructure monitoring, and Docker networking into a single service architecture.
+The environment combines centralized DNS filtering, reverse proxying, infrastructure monitoring, Docker networking, and centralized security monitoring into a single service architecture.
 
 The stack consists of:
 
@@ -17,10 +17,13 @@ The stack consists of:
 - Uptime Kuma
 - Docker bridge networking
 - Shared external Docker network
+- Wazuh security monitoring
+- Linux and Windows endpoint monitoring
+- Automated SSH containment
 
 The infrastructure was configured and validated through hands-on testing using Linux networking tools, DNS queries, Docker inspection, and service connectivity tests.
 
-This project serves as a capstone demonstrating how multiple infrastructure services can be integrated into a functional homelab environment.
+This project serves as a capstone demonstrating how infrastructure, monitoring, and security services can be integrated into a functional homelab environment.
 
 ---
 
@@ -517,6 +520,79 @@ This prevents immediately changing configuration without first identifying the l
 
 ---
 
+## Security Monitoring
+
+The infrastructure has been extended with a dedicated Wazuh security monitoring environment.
+
+The Wazuh server runs on Ubuntu 24.04.5 LTS at:
+
+```text
+192.168.200.180
+```
+
+It provides:
+
+- Wazuh Manager
+- Wazuh Indexer
+- Wazuh Dashboard
+- Centralized endpoint monitoring
+- Security event collection
+- Detection and investigation
+- Automated response
+
+The current monitored endpoints are:
+
+| Endpoint | Address | Role |
+|---|---|---|
+| Pi-hole | `192.168.200.178` | Linux endpoint / DNS / Docker host |
+| Windows 11 | `192.168.200.182` | Windows endpoint |
+
+### Security Architecture
+
+```text
+                    Homelab LAN
+                 192.168.200.0/24
+                         |
+            +------------+------------+
+            |                         |
+            v                         v
+       Pi-hole                     Windows 11
+       .178                         .182
+       Wazuh Agent                 Wazuh Agent
+            |                         |
+            +------------+------------+
+                         |
+                         v
+                  Wazuh Server
+                     .180
+                         |
+              +----------+----------+
+              |          |          |
+              v          v          v
+           Manager    Indexer    Dashboard
+```
+
+The security lab includes:
+
+- Linux SSH monitoring
+- Windows authentication monitoring
+- Windows Defender telemetry
+- Windows Firewall telemetry
+- File Integrity Monitoring
+- Rootcheck
+- Security Configuration Assessment
+- System inventory
+- Controlled security-event testing
+- Automated SSH containment
+
+The first automated-response workflow also demonstrated an important operational lesson. Wazuh's generic `firewall-drop` response affected the Pi-hole's Docker forwarding path, so the response was redesigned as a custom `ssh_contain` workflow that validates the source and restricts containment to SSH traffic on the Pi-hole INPUT chain.
+
+Detailed security documentation is maintained under:
+
+```text
+security/wazuh/
+```
+
 ## Related Projects
 
 This capstone builds upon the individual projects documented separately in my homelab portfolio.
@@ -552,6 +628,20 @@ Documents:
 - Network client discovery
 - DNS troubleshooting
 - DNS filtering validation
+
+### Wazuh Security Monitoring
+
+Documents:
+
+- Wazuh server deployment and hardening
+- Linux endpoint monitoring
+- Windows endpoint monitoring
+- SSH detection and automated containment
+- Windows Defender telemetry
+- Windows Firewall telemetry
+- Security-event validation
+
+See the complete security project under `security/wazuh/`.
 
 ### Linux Service Troubleshooting
 
@@ -592,6 +682,10 @@ This capstone demonstrates practical experience with:
 - SSL certificate management
 - Infrastructure monitoring
 - Uptime Kuma
+- Wazuh
+- Security event monitoring
+- Endpoint telemetry
+- Automated security response
 - SSH administration
 - Network troubleshooting
 - Service validation
@@ -638,4 +732,6 @@ Manager
 
 The project demonstrates how individual services can be combined into a cohesive infrastructure platform and validated using a structured troubleshooting methodology.
 
-This capstone represents the progression from configuring individual homelab services to designing and documenting an integrated infrastructure environment.
+The addition of Wazuh extends the environment beyond infrastructure availability and service monitoring into centralized security monitoring and controlled automated response.
+
+This capstone represents the progression from configuring individual homelab services to designing, securing, validating, and documenting an integrated infrastructure environment.

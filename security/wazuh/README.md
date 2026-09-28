@@ -2,7 +2,9 @@
 
 ## Overview
 
-This project extends the homelab infrastructure into a centralized security monitoring and detection environment using Wazuh.
+This project extends the homelab infrastructure into a centralized security monitoring, detection, investigation, and automated-response environment using Wazuh.
+
+The lab was built as a practical security engineering project rather than a collection of isolated configuration exercises. Each stage was deployed, tested, investigated, and documented before moving to the next capability.
 
 The lab was designed to demonstrate the complete security monitoring lifecycle:
 
@@ -18,6 +20,18 @@ The lab was designed to demonstrate the complete security monitoring lifecycle:
 10. Document the resulting security architecture
 
 The environment uses Wazuh Manager, Wazuh Indexer, Wazuh Dashboard, a Raspberry Pi Linux endpoint, and a Windows 11 endpoint.
+
+---
+
+## Documentation
+
+The Wazuh project is organized into focused documents so that this README provides the architecture and project overview while implementation details live in dedicated documents.
+
+| Document | Purpose |
+|---|---|
+| [Linux Agent](./linux-agent/README.md) | Pi-hole deployment, Linux monitoring, SSH telemetry, Syscheck, Rootcheck, SCA, inventory, and Active Response |
+| [Windows Agent](./windows-agent/README.md) | Windows deployment, authentication monitoring, Defender telemetry, Firewall telemetry, Syscheck, SCA, and inventory |
+| [SSH Detection & Automated Containment](./ssh-detection/README.md) | Rule 5710, initial `firewall-drop` investigation, Docker networking issue, custom `ssh_contain`, and safety validation |
 
 ---
 
@@ -81,7 +95,8 @@ The environment uses Wazuh Manager, Wazuh Indexer, Wazuh Dashboard, a Raspberry 
 - Hostname: `pihole`
 - IP: `192.168.200.178`
 - OS: Debian 13
-- Architecture: ARM64
+- Architecture: ARM64 / AArch64
+- Agent ID: `001`
 
 ### Windows Agent
 
@@ -185,12 +200,6 @@ Microsoft-Windows-Windows Defender/Operational
 The channel was verified as enabled and actively generating events.
 
 Wazuh's native Windows Defender rules include events such as:
-
-| Event ID | Wazuh Rule | Description | Level |
-|---|---:|---|---:|
-| 1150 | 62128 | Antimalware platform healthy | 3 |
-| 1151 | 62129 | Endpoint Protection client health report | 2 |
-| 2000 | 62130 | Antimalware definitions updated successfully | 3 |
 
 The agent log confirmed the event channel was loaded successfully after restart.
 
@@ -336,10 +345,17 @@ Testing automated firewall response against a remotely managed host can lock out
 
 ## Related Documentation
 
-Detailed SSH detection and Active Response documentation is maintained in:
+Detailed documentation is organized under this Wazuh directory:
 
 ```text
-security/wazuh-ssh-detection/
+security/wazuh/
+├── README.md
+├── linux-agent/
+│   └── README.md
+├── windows-agent/
+│   └── README.md
+└── ssh-detection/
+    └── README.md
 ```
 
 This project will continue to be expanded as additional security monitoring and detection capabilities are added to the homelab.

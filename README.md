@@ -43,32 +43,35 @@ This project serves as a capstone demonstrating how infrastructure, monitoring, 
                                    |
                             192.168.200.0/24
                                    |
-                    +--------------+--------------+
-                    |                             |
-                    v                             v
-             Client Devices                Raspberry Pi
-             192.168.200.x                 192.168.200.178
-                    |                             |
-                    | DNS                         |
-                    +-----------> Pi-hole         |
-                                  DNS :53          |
-                                                  |
-                                           +------+------+
-                                           |             |
-                                           v             v
-                                      Docker Host      SSH
-                                           |             :22
-                              +------------+------------+
-                              |                         |
-                              v                         v
-                       Nginx Proxy                 Uptime Kuma
-                        Manager                    Monitoring
-                              |                         |
-                              +-----------+-------------+
-                                          |
-                                          v
-                                   Docker proxy
-                                  172.19.0.0/16
+          +------------------------+------------------------+
+          |                        |                        |
+          v                        v                        v
+   Client Devices             Raspberry Pi             Wazuh Server
+   192.168.200.x              192.168.200.178          192.168.200.180
+          |                        |                        |
+          | DNS                    | Wazuh Agent            |
+          +-----------> Pi-hole    +------------------------+
+                               |                             |
+                         +-----+-----+                       |
+                         |           |                       |
+                         v           v                       |
+                    Docker Host     SSH                       |
+                         |           :22                       |
+             +-----------+-----------+                         |
+             |                       |                         |
+             v                       v                         |
+      Nginx Proxy              Uptime Kuma                     |
+       Manager                 Monitoring                      |
+             |                       |                         |
+             +-----------+-----------+                         |
+                         |                                     |
+                         v                                     v
+                  Docker proxy                         Wazuh Manager /
+                 172.19.0.0/16                     Indexer / Dashboard
+                                                           |
+                                                           v
+                                                    Windows 11 Agent
+                                                      192.168.200.182
 ```
 
 ---
@@ -593,6 +596,43 @@ Detailed security documentation is maintained under:
 security/wazuh/
 ```
 
+
+---
+
+## Security Posture and Remediation Status
+
+**Review status:** Security audit and repository remediation in progress  
+**Last reviewed:** September 2026
+
+The infrastructure documentation has been reviewed for credential exposure, service access boundaries, container configuration, and security-monitoring coverage.
+
+### Completed
+
+- Historical plaintext credentials were removed from the affected repository histories.
+- Current credential handling was changed to local/environment-based configuration where applicable.
+- Wazuh server hardening and endpoint monitoring are documented under `security/wazuh/`.
+- Windows Defender and Windows Firewall telemetry are documented.
+- SSH detection and the custom `ssh_contain` response are documented.
+- Access-boundary findings for Samba, SQL Server, Nginx Proxy Manager, and Portainer have been documented in their respective projects.
+- Docker image versioning findings have been documented for controlled future pinning.
+
+### Pending live validation
+
+The following changes require access to the live homelab and should not be inferred from repository configuration alone:
+
+- Samba guest-write remediation
+- SQL Server TCP/1433 access restriction
+- Nginx Proxy Manager TCP/81 management restriction
+- Portainer management-access review
+- Docker image version pinning after recording currently deployed versions
+
+These are intentionally handled as controlled changes so existing services and backup workflows can be validated after each modification.
+
+### Security documentation model
+
+The capstone describes the architecture and intended trust boundaries. Individual project repositories remain the authoritative location for service-specific configuration and remediation procedures.
+
+
 ## Related Projects
 
 This capstone builds upon the individual projects documented separately in my homelab portfolio.
@@ -605,7 +645,6 @@ Documents the physical and logical network architecture, including:
 - DHCP
 - Raspberry Pi
 - DNS
-- DHCP
 - Pi-hole
 
 ### Docker Network Segmentation

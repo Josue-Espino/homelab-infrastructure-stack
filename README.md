@@ -29,50 +29,72 @@ This project serves as a capstone demonstrating how infrastructure, monitoring, 
 
 ## Architecture
 
-```text
-                              INTERNET
-                                  |
-                                  |
-                         +-------------------+
-                         |  Aquila PRO M30   |
-                         |   192.168.200.1   |
-                         |                   |
-                         | Gateway + DHCP    |
-                         +---------+---------+
-                                   |
-                                   |
-                            192.168.200.0/24
-                                   |
-          +------------------------+------------------------+
-          |                        |                        |
-          v                        v                        v
-   Client Devices             Raspberry Pi             Wazuh Server
-   192.168.200.x              192.168.200.178          192.168.200.180
-          |                        |                        |
-          | DNS                    | Wazuh Agent            |
-          +-----------> Pi-hole    +------------------------+
-                               |                             |
-                         +-----+-----+                       |
-                         |           |                       |
-                         v           v                       |
-                    Docker Host     SSH                       |
-                         |           :22                       |
-             +-----------+-----------+                         |
-             |                       |                         |
-             v                       v                         |
-      Nginx Proxy              Uptime Kuma                     |
-       Manager                 Monitoring                      |
-             |                       |                         |
-             +-----------+-----------+                         |
-                         |                                     |
-                         v                                     v
-                  Docker proxy                         Wazuh Manager /
-                 172.19.0.0/16                     Indexer / Dashboard
-                                                           |
-                                                           v
-                                                    Windows 11 Agent
-                                                      192.168.200.182
+The master architecture below shows the current live homelab, including the LAN, Proxmox workloads, Raspberry Pi services, Wazuh monitoring, and the two remote-access paths.
+
+```mermaid
+flowchart TB
+    Internet((Internet))
+    Router["Aquila PRO M30<br/>192.168.200.1<br/><br/>Gateway + DHCP"]
+    Internet --> Router
+    Router --> LAN["Homelab LAN<br/>192.168.200.0/24"]
+
+    subgraph Remote["Remote Access"]
+        Tailscale["Tailscale<br/>LXC 100 / Proxmox environment"]
+        WireGuard["WireGuard<br/>Raspberry Pi .178<br/>UDP 51820"]
+        RemoteClient["Remote Client"]
+    end
+    RemoteClient --> Tailscale
+    RemoteClient --> WireGuard
+    Tailscale -.->|Remote Jellyfin access| Jellyfin
+    WireGuard --> LAN
+
+    subgraph Pi["Raspberry Pi • 192.168.200.178"]
+        PiHole["Pi-hole<br/>DNS"]
+        NPM["Nginx Proxy Manager<br/>80 / 81 / 443"]
+        Kuma["Uptime Kuma<br/>Docker"]
+        ProxyNet["Docker proxy network<br/>172.19.0.0/16"]
+        PiHole --> NPM
+        NPM --- ProxyNet
+        Kuma --- ProxyNet
+    end
+
+    subgraph Proxmox["Proxmox"]
+        Jellyfin["CT 101<br/>Jellyfin"]
+        Media["CT 102<br/>Sonarr / Radarr / Prowlarr"]
+        Downloads["CT 103<br/>qBittorrent / Unpackerr"]
+        Byparr["CT 104<br/>Byparr"]
+        WazuhVM["VM 105<br/>Wazuh Server<br/>192.168.200.180"]
+        Tailscale --- Jellyfin
+        Media --> Jellyfin
+        Downloads --> Media
+        Byparr --> Media
+    end
+
+    subgraph Security["Wazuh Monitoring"]
+        PiAgent["Pi-hole<br/>Wazuh Agent 001"]
+        WinAgent["Windows 11<br/>192.168.200.182<br/>Wazuh Agent 002"]
+        Manager["Wazuh Manager / Indexer / Dashboard"]
+        PiAgent --> Manager
+        WinAgent --> Manager
+    end
+
+    LAN --> Pi
+    LAN --> Proxmox
+    LAN --> WinAgent
+    WazuhVM --- Manager
+    PiAgent --- Pi
 ```
+
+### Architecture Notes
+
+- **Tailscale** runs in the Proxmox environment and provides the remote-access path used to reach the Proxmox-hosted Jellyfin service.
+- **WireGuard** terminates on the Raspberry Pi and provides remote access into the `192.168.200.0/24` homelab network through the Pi.
+- **Pi-hole** provides network DNS and also hosts the Raspberry Pi Docker services.
+- **Nginx Proxy Manager** provides the reverse-proxy and HTTPS layer for web services.
+- **Uptime Kuma** monitors homelab services and participates in the shared Docker `proxy` network.
+- **Wazuh** runs as VM 105 and receives telemetry from the Pi-hole and Windows agents.
+- **Proxmox** hosts the media automation stack and Wazuh VM.
+- The Samba, SQL Server, and Portainer projects are documented separately and are not shown as live services because those VMs are currently powered off.
 
 ---
 

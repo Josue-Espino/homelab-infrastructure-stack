@@ -644,7 +644,8 @@ The infrastructure documentation has been reviewed for credential exposure, serv
 - Windows Defender and Windows Firewall telemetry are documented.
 - SSH detection and the custom `ssh_contain` response are documented.
 - Access-boundary findings for Samba, SQL Server, Nginx Proxy Manager, and Portainer have been documented in their respective projects.
-- Docker image versioning findings have been documented for controlled future pinning.
+- Live Docker image references for Nginx Proxy Manager and Uptime Kuma were pinned to their currently validated application versions without performing an application upgrade.
+- The pinned Compose definitions were validated successfully.
 
 ### Pending live validation
 
@@ -654,7 +655,7 @@ The following changes require access to the live homelab and should not be infer
 - SQL Server TCP/1433 access restriction
 - Nginx Proxy Manager TCP/81 management restriction
 - Portainer management-access review
-- Docker image version pinning after recording currently deployed versions
+- Controlled container recreation using the pinned Nginx Proxy Manager and Uptime Kuma image references
 
 These are intentionally handled as controlled changes so existing services and backup workflows can be validated after each modification.
 
